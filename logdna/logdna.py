@@ -149,17 +149,18 @@ class LogDNAHandler(logging.Handler):
     def try_lock_and_do_flush_request(self, should_block=False):
         local_buf = []
         if self._lock.acquire(blocking=should_block):
-            if not self.buf:
-                self.close_flusher()
-                self._lock.release()
-                return
+            try:
+                if not self.buf:
+                    self.close_flusher()
+                    return
 
-            local_buf = self.buf.copy()
-            self.buf.clear()
-            self.buf_size = 0
-            if local_buf:
-                self.close_flusher()
-            self._lock.release()
+                local_buf = self.buf.copy()
+                self.buf.clear()
+                self.buf_size = 0
+                if local_buf:
+                    self.close_flusher()
+            finally:
+                self._lock.release()
 
         if local_buf:
             self.try_request(local_buf)
