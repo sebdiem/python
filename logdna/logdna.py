@@ -122,20 +122,20 @@ class LogDNAHandler(logging.Handler):
                 self._lock.release()
 
     def flush(self):
-        self.schedule_flush_sync()
+        self.flush_with_lock()
 
-    def schedule_flush_sync(self, should_block=False):
+    def flush_with_lock(self, should_block=False):
         if self.request_thread_pool:
             try:
                 self.request_thread_pool.submit(
-                    self.try_lock_and_do_flush_request, should_block)
+                    self.flush_sync, should_block)
             except RuntimeError:
-                self.try_lock_and_do_flush_request(should_block)
+                self.flush_sync(should_block)
             except Exception as e:
                 self.internalLogger.debug(
                     'Error in calling try_lock_and_do_flush_request: %s', e)
 
-    def try_lock_and_do_flush_request(self, should_block=False):
+    def flush_sync(self, should_block=False):
         local_buf = []
         if self._lock.acquire(blocking=should_block):
             if not self.buf:
@@ -342,7 +342,7 @@ class LogDNAHandler(logging.Handler):
         # application exiting and because the probability of this
         # introducing a noticeable delay is very low because close() is only
         # called when the logger and application are shutting down.
-        self.schedule_flush_sync(should_block=True)
+        self.flush_with_lock(should_block=True)
 
         # Finally, shut down the thread pool that was used to send the log
         # messages to the server. We can assume at this point that all log
