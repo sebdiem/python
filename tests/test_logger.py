@@ -4,6 +4,7 @@ import requests
 import time
 import os
 
+import pytest
 from logdna import LogDNAHandler
 from concurrent.futures import ThreadPoolExecutor
 from logdna.configs import defaults
@@ -263,6 +264,15 @@ class LogDNAHandlerTest(unittest.TestCase):
             should_block=True)
         self.assertIsNone(handler.worker_thread_pool)
         self.assertIsNone(handler.request_thread_pool)
+
+    @pytest.mark.timeout(3)
+    def test_simultaneous_close_and_log_should_not_deadlock(self):
+        handler = LogDNAHandler(LOGDNA_API_KEY, sample_options)
+        logging.basicConfig(
+            level=logging.INFO, handlers=[handler], force=True)
+        logger.info("test message")
+        logging.basicConfig(
+            level=logging.INFO, handlers=[handler], force=True)
 
     # These should be separate objects, since there is already
     # a variable in the base class named self.lock. We want
