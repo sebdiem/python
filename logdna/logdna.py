@@ -122,9 +122,7 @@ class LogDNAHandler(logging.Handler):
                 self._lock.release()
 
     def flush(self):
-        self.flush_with_lock()
-
-    def flush_with_lock(self, should_block=False):
+        should_block = False
         if self.request_thread_pool:
             try:
                 self.request_thread_pool.submit(
@@ -337,19 +335,19 @@ class LogDNAHandler(logging.Handler):
             self.worker_thread_pool.shutdown(wait=True)
             self.worker_thread_pool = None
 
-        # Manually force a flush of any remaining log messages in the buffer.
+        # Shut down the thread pool that was used to send the log messages to
+        # the server. We can assume at this point that all log messages that
+        # were in the buffer prior to the worker threads shutting down have
+        # been sent to the server.
+        if self.request_thread_pool:
+            self.request_thread_pool.shutdown(wait=True)
+            self.request_thread_pool = None
+
+        # Finally force a flush of any remaining log messages in the buffer.
         # We block here to ensure that the flush completes prior to the
         # application exiting and because the probability of this
         # introducing a noticeable delay is very low because close() is only
         # called when the logger and application are shutting down.
-        self.flush_with_lock(should_block=True)
-
-        # Finally, shut down the thread pool that was used to send the log
-        # messages to the server. We can assume at this point that all log
-        # messages that were in the buffer prior to the worker threads
-        # shutting down have been sent to the server.
-        if self.request_thread_pool:
-            self.request_thread_pool.shutdown(wait=True)
-            self.request_thread_pool = None
+        self.flush_sync(should_block=True)
 
         logging.Handler.close(self)
